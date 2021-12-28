@@ -7,6 +7,11 @@
 
 # Test binary, built with `go test -c`
 *.test
+conf/config2.json
+bin/*
+input/nodes1.csv
+input/nodes2.csv
+input/nodes3.csv
 
 # Output of the go coverage tool, specifically when used with LiteIDE
 *.out

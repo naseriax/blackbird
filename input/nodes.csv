@@ -1,0 +1,4 @@
+ipAddress,name,username,password,mailNotification,cpuThreshold,ramThreshold,diskThreshold,sshPort
+1.1.1.1,n1,root,pass,1,10,10,10,22
+2.2.2.2,n2,root,pass,1,10,10,10,22
+3.3.3.3,n3,root,pass,1,10,10,10,22
