@@ -10,7 +10,7 @@ Monitor Nokia 1830PSS equipment's RAM/CPU/Disk utilization in Go!
 
 ![alt text](https://raw.githubusercontent.com/naseriax/token-repo/main/sshtunnel.png)
 
-# config file structure:
+## config file structure:
 ```
 "mailRelayIp": "1.1.1.1",        <-- SMTP relay server ip address to receive mail notifications(Future use)
 "mailInterval" : "1800",         <-- email sending inerval in seconds to avoid mailbox overload (Future use)
@@ -25,7 +25,7 @@ Monitor Nokia 1830PSS equipment's RAM/CPU/Disk utilization in Go!
 "sshGwPort":"22"                 <-- if sshTunnel is true, this port will be used to connect to the ssh server (allowed port between local machine anc ssh server)
 ```
 
-# nodes file structure:
+## nodes file structure:
 ```
 ipAddress             <-- ne IP address
 name                  <-- ne name, no need to match the actual node name
@@ -37,4 +37,22 @@ ramThreshold          <-- if current ram utilization value is above this value, 
 diskThreshold         <-- if current disk utilization values are above this value, it will be logged, mailed and printed
 sshPort               <-- allowed ssh port on the ne
 localport             <-- if sshTunnel in config file is true, the ssh tunnel will be mapped to this port number on the local machine
+```
+
+
+### Below commands will be executed on the target machine every {interval} seconds:
+
+CPU:
+```
+cat <(grep 'cpu ' /proc/stat) <(sleep 1 && grep 'cpu ' /proc/stat) | awk -v RS="" '{print ($13-$2+$15-$4)*100/($13-$2+$15-$4+$16-$5)}'
+```
+
+RAM:
+```
+free -m
+```
+
+Disk:
+```
+df -hP
 ```
