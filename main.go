@@ -11,10 +11,10 @@ import (
 )
 
 func main() {
-	configFileName := "config2.json"
+	configFileName := "config.json"
 	configFilePath := filepath.Join("conf", configFileName)
 	Config := ioreader.ConfigLoader(configFilePath)
-	Nodes := ioreader.NodeLoader(filepath.Join("input", Config.InputFileName))
+	Nodes := ioreader.NodeLoader(filepath.Join("input", Config.InputFileName), Config.SshTunnel)
 
 	cmds := []string{
 		`cat <(grep 'cpu ' /proc/stat) <(sleep 1 && grep 'cpu ' /proc/stat) | awk -v RS="" '{print ($13-$2+$15-$4)*100/($13-$2+$15-$4+$16-$5)}'`, //-- CPU Query

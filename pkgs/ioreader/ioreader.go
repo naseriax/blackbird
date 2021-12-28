@@ -36,7 +36,7 @@ type Node struct {
 	Localport        string
 }
 
-func ParseCSV(csvdata [][]string) map[string]Node {
+func ParseCSV(csvdata [][]string, isTunnel bool) map[string]Node {
 	nodes := map[string]Node{}
 	floatVals := [3]float64{}
 
@@ -59,7 +59,9 @@ func ParseCSV(csvdata [][]string) map[string]Node {
 			RamThreshold:     floatVals[1],
 			DiskThreshold:    floatVals[2],
 			SshPort:          row[8],
-			Localport:        row[9],
+		}
+		if isTunnel {
+			tmp.Localport = row[9]
 		}
 		nodes[tmp.Name] = tmp
 	}
@@ -93,8 +95,8 @@ func ConfigLoader(filePath string) Config {
 	return config
 }
 
-func NodeLoader(filename string) map[string]Node {
+func NodeLoader(filename string, isTunnel bool) map[string]Node {
 	records := readCsvFile(filename)
-	nodeList := ParseCSV(records)
+	nodeList := ParseCSV(records, isTunnel)
 	return nodeList
 }

@@ -5,7 +5,7 @@
     "queryInterval": "20",
     "inputFileName": "nodes.csv",
     "workerQuantity": "3",
-    "sshTunnel" : true,
+    "sshTunnel" : false,
 	"sshGwIp":"2.2.2.2",
 	"sshGwUser":"root",
 	"sshGwPass" :"pass",
