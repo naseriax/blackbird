@@ -35,7 +35,7 @@ func Pipe(ch chan int, writer, reader net.Conn) {
 	ch <- 1
 }
 
-func Tunnel(ch chan int, conn *ssh.Client, local, remote string) {
+func Tunnel(ch chan int, lstReady chan bool, conn *ssh.Client, local, remote string) {
 	lst, err := net.Listen("tcp", local)
 	if err != nil {
 		if strings.Contains(err.Error(), "bind: address already in use") {
@@ -43,6 +43,7 @@ func Tunnel(ch chan int, conn *ssh.Client, local, remote string) {
 			return
 		}
 	}
+	lstReady <- true
 	here, err := lst.Accept()
 	if err != nil {
 		panic(err)
@@ -76,7 +77,7 @@ func (s *SshAgent) Connect() error {
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 		Timeout:         time.Duration(s.Timeout) * time.Second,
 	}
-	time.Sleep(time.Second)
+	// time.Sleep(time.Second)
 	s.Client, err = ssh.Dial("tcp", fmt.Sprintf("%v:%v", s.Host, s.Port), config)
 	if err != nil {
 		log.Printf("Failed to dial: %v\n", err)

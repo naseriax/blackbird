@@ -86,6 +86,7 @@ func NodeQuery(busyWorkers *int, wg *sync.WaitGroup, ch chan ResourceUtil, cmds 
 	var ClientConn *ssh.Client
 
 	if config.SshTunnel {
+		lstReady := make(chan bool)
 		sshConfig := &ssh.ClientConfig{
 			User: config.SshGwUser,
 			Auth: []ssh.AuthMethod{
@@ -101,10 +102,11 @@ func NodeQuery(busyWorkers *int, wg *sync.WaitGroup, ch chan ResourceUtil, cmds 
 			log.Fatalf("failed to connect to the ssh server: %q", err)
 		}
 
-		go sshagent.Tunnel(chx, ClientConn, fmt.Sprintf("localhost:%v", ne.Localport), fmt.Sprintf("%v:%v", ne.IpAddress, ne.SshPort))
+		go sshagent.Tunnel(chx, lstReady, ClientConn, fmt.Sprintf("localhost:%v", ne.Localport), fmt.Sprintf("%v:%v", ne.IpAddress, ne.SshPort))
 
 		log.Printf("Created the ssh tunnel for %v (%v) - Local interface: localhost:%v.\n", ne.IpAddress, ne.Name, ne.Localport)
 
+		<-lstReady
 		sshc, err = sshagent.Init(ne.Name, "localhost", ne.Localport, ne.Username, ne.Password, 10)
 		if err != nil {
 			log.Printf("connection error - %v - %v", ne.Name, err)

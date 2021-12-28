@@ -29,7 +29,7 @@ func main() {
 
 	for {
 		Config = ioreader.ConfigLoader(configFilePath)
-		qint, _ := strconv.ParseInt(Config.QueryInterval, 16, 16)
+		qint, _ := strconv.ParseInt(Config.QueryInterval, 10, 16)
 		totalWorker, _ := strconv.ParseInt(Config.WorkerQuantity, 10, 64)
 		log.Printf("Total Workers: %v\n", totalWorker)
 
