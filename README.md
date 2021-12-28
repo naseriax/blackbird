@@ -12,7 +12,7 @@ Monitor Nokia 1830PSS equipment's RAM/CPU/Disk utilization in Go!
 
 # config file structure:
 ```
-"mailRelayIp": "1.1.1.1",        <-- SMTP relay server ip address (Future use)
+"mailRelayIp": "1.1.1.1",        <-- SMTP relay server ip address to receive mail notifications(Future use)
 "mailInterval" : "1800",         <-- email sending inerval in seconds to avoid mailbox overload (Future use)
 "logSize": "10",                 <-- log file rotation triggering size (Future use)
 "queryInterval": "20",           <-- time in seconds to wait between each query on nes
@@ -25,3 +25,16 @@ Monitor Nokia 1830PSS equipment's RAM/CPU/Disk utilization in Go!
 "sshGwPort":"22"                 <-- if sshTunnel is true, this port will be used to connect to the ssh server (allowed port between local machine anc ssh server)
 ```
 
+# nodes file structure:
+```
+ipAddress             <-- ne IP address
+name                  <-- ne name, no need to match the actual node name
+username              <-- ssh username to be used to connect to the ne
+password              <-- ssh password to be used to connect to the ne
+mailNotification      <-- whether to send mail notification in case of any utilization violation (Future use)
+cpuThreshold          <-- if current cpu utilization value is above this value, it will be logged, mailed and printed
+ramThreshold          <-- if current ram utilization value is above this value, it will be logged, mailed and printed
+diskThreshold         <-- if current disk utilization values are above this value, it will be logged, mailed and printed
+sshPort               <-- allowed ssh port on the ne
+localport             <-- if sshTunnel in config file is true, the ssh tunnel will be mapped to this port number on the local machine
+```
