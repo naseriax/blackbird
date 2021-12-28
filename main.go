@@ -1,8 +1,8 @@
 package main
 
 import (
-	"goxmon/pkgs/ioreader"
-	"goxmon/pkgs/retriever"
+	"blackbird/pkgs/ioreader"
+	"blackbird/pkgs/retriever"
 	"log"
 	"path/filepath"
 	"strconv"

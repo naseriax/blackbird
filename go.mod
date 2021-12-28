@@ -1,4 +1,4 @@
-module goxmon
+module blackbird
 
 go 1.17
 
