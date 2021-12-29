@@ -14,17 +14,18 @@ import (
 
 //SshAgent object contains all ssh connectivity info and tools.
 type SshAgent struct {
-	Host     string
-	Name     string
-	Port     string
-	UserName string
-	Password string
-	Timeout  int
-	Client   *ssh.Client
-	Session  *ssh.Session
+	Host         string
+	Name         string
+	Port         string
+	UserName     string
+	Password     string
+	Timeout      int
+	Client       *ssh.Client
+	Session      *ssh.Session
+	ClientStatus bool
 }
 
-func Pipe(ch chan int, writer, reader net.Conn) {
+func Pipe(copyProgress chan int, writer, reader net.Conn) {
 	defer writer.Close()
 	defer reader.Close()
 
@@ -32,10 +33,10 @@ func Pipe(ch chan int, writer, reader net.Conn) {
 	if err != nil {
 		log.Printf("failed to copy: %s", err)
 	}
-	ch <- 1
+	copyProgress <- 1
 }
 
-func Tunnel(ch chan int, lstReady chan bool, conn *ssh.Client, local, remote string) {
+func Tunnel(pipeProgress chan int, lstReady chan bool, conn *ssh.Client, local, remote string) {
 	lst, err := net.Listen("tcp", local)
 	if err != nil {
 		if strings.Contains(err.Error(), "bind: address already in use") {
@@ -43,30 +44,34 @@ func Tunnel(ch chan int, lstReady chan bool, conn *ssh.Client, local, remote str
 			return
 		}
 	}
+
 	lstReady <- true
+
 	here, err := lst.Accept()
 	if err != nil {
 		panic(err)
 	}
-	go func(ch chan int, here net.Conn) {
-		ch1 := make(chan int)
+	go func(pipeProgress chan int, here net.Conn) {
+		copyProgress := make(chan int)
 		there, err := conn.Dial("tcp", remote)
 		if err != nil {
-			log.Fatalf("failed to dial to remote: %q", err)
+			log.Printf("failed to dial to remote: %q", err)
+			lst.Close()
+			return
 		}
-		go Pipe(ch1, there, here)
-		go Pipe(ch1, here, there)
-
-		<-ch1
-		c := <-ch1
-		ch <- c
+		go Pipe(copyProgress, there, here)
+		go Pipe(copyProgress, here, there)
+		<-copyProgress
+		<-copyProgress
+		pipeProgress <- 1
 		lst.Close()
-	}(ch, here)
+	}(pipeProgress, here)
 
 }
 
 //Connect connects to the specified server and opens a session (Filling the Client and Session fields in SshAgent struct)
 func (s *SshAgent) Connect() error {
+	neReady := make(chan bool)
 	var err error
 
 	config := &ssh.ClientConfig{
@@ -77,14 +82,23 @@ func (s *SshAgent) Connect() error {
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 		Timeout:         time.Duration(s.Timeout) * time.Second,
 	}
-	// time.Sleep(time.Second)
-	s.Client, err = ssh.Dial("tcp", fmt.Sprintf("%v:%v", s.Host, s.Port), config)
-	if err != nil {
-		log.Printf("Failed to dial: %v\n", err)
-		return err
+
+	go func(neReady chan bool) {
+		s.Client, err = ssh.Dial("tcp", fmt.Sprintf("%v:%v", s.Host, s.Port), config)
+		if err != nil {
+			log.Printf("Failed to dial: %v\n", err)
+			time.Sleep(11 * time.Second)
+		}
+		neReady <- true
+	}(neReady)
+
+	select {
+	case <-neReady:
+		return nil
+	case <-time.After(10 * time.Second):
+		return fmt.Errorf("failed to connect to remote node")
 	}
 
-	return nil
 }
 
 //Exec executed a single command on the ssh session.
@@ -107,8 +121,11 @@ func (s *SshAgent) Exec(cmd string) (string, error) {
 
 //Disconnect closes the ssh sessoin and connection.
 func (s *SshAgent) Disconnect() {
+	if s.ClientStatus {
+		s.Client.Close()
+		s.ClientStatus = false
+	}
 	s.Client.Close()
-	log.Printf("Closed the ssh session for ne %v.", s.Name)
 }
 
 //Init initialises the ssh connection and returns the usable ssh agent.
@@ -127,6 +144,7 @@ func Init(name, host, port, username, password string, timeout int) (SshAgent, e
 	if err != nil {
 		return sshagent, err
 	} else {
+		sshagent.ClientStatus = true
 		return sshagent, nil
 	}
 }

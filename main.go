@@ -22,7 +22,8 @@ func main() {
 		`free -m`, //--------------------------------------------------------------------------------------------------------------------------------- RAM Query
 	}
 
-	ch := make(chan retriever.ResourceUtil, len(Nodes))
+	nedata := make(chan retriever.ResourceUtil, len(Nodes))
+	errdata := make(chan bool)
 	var wg sync.WaitGroup
 
 	busyWorkers := 0
@@ -41,14 +42,18 @@ func main() {
 			}
 			wg.Add(1)
 			busyWorkers += 1
-			go retriever.NodeQuery(&busyWorkers, &wg, ch, cmds, ne, Config)
+			go retriever.NodeQuery(&busyWorkers, &wg, nedata, errdata, cmds, ne, Config)
 		}
 		wg.Wait()
 		busyWorkers = 0
-		for range Nodes {
-			result := <-ch
-			retriever.UtilizationAssessment(Nodes, result)
-
+		for _, m := range Nodes {
+			select {
+			case <-errdata:
+				log.Printf("error - no data received from %v\n", m.Name)
+				continue
+			case result := <-nedata:
+				retriever.UtilizationAssessment(Nodes, result)
+			}
 		}
 		log.Println("going for sleep...")
 		time.Sleep(time.Duration(qint) * time.Second)

@@ -75,14 +75,15 @@ func dskParse(res string) map[string]float64 {
 	return output
 }
 
-func NodeQuery(busyWorkers *int, wg *sync.WaitGroup, ch chan ResourceUtil, cmds []string, ne ioreader.Node, config ioreader.Config) {
+func NodeQuery(busyWorkers *int, wg *sync.WaitGroup, nedata chan ResourceUtil, errdata chan bool, cmds []string, ne ioreader.Node, config ioreader.Config) {
 	log.Printf("collecting info from ne %v", ne.Name)
 	var err error
+	var res string
 	sshc := sshagent.SshAgent{}
 	result := ResourceUtil{
 		Name: ne.Name,
 	}
-	chx := make(chan int)
+	pipeprogress := make(chan int)
 	var ClientConn *ssh.Client
 
 	if config.SshTunnel {
@@ -99,29 +100,58 @@ func NodeQuery(busyWorkers *int, wg *sync.WaitGroup, ch chan ResourceUtil, cmds 
 		ClientConn, err = ssh.Dial("tcp", fmt.Sprintf("%v:%v", config.SshGwIp, config.SshGwPort), sshConfig)
 
 		if err != nil {
-			log.Fatalf("failed to connect to the ssh server: %q", err)
+			if strings.Contains(err.Error(), "i/o timeout") {
+				log.Println("failed to connect to the ssh gateway - gateway unreachable!")
+				wg.Done()
+				errdata <- true
+				return
+			} else {
+				log.Fatalf("failed to connect to the ssh server: %q", err)
+			}
 		}
 
-		go sshagent.Tunnel(chx, lstReady, ClientConn, fmt.Sprintf("localhost:%v", ne.Localport), fmt.Sprintf("%v:%v", ne.IpAddress, ne.SshPort))
+		go sshagent.Tunnel(pipeprogress, lstReady, ClientConn, fmt.Sprintf("localhost:%v", ne.Localport), fmt.Sprintf("%v:%v", ne.IpAddress, ne.SshPort))
 
-		log.Printf("Created the ssh tunnel for %v (%v) - Local interface: localhost:%v.\n", ne.IpAddress, ne.Name, ne.Localport)
+		select {
+		case <-lstReady:
+			break
+		case <-time.After(10 * time.Second):
+			log.Printf("failed to create the local listener channel - %v - %v", ne.Name, err)
+			wg.Done()
+			errdata <- true
+			return
+		}
 
-		<-lstReady
 		sshc, err = sshagent.Init(ne.Name, "localhost", ne.Localport, ne.Username, ne.Password, 10)
 		if err != nil {
-			log.Printf("connection error - %v - %v", ne.Name, err)
+			log.Printf("connect() error - %v - %v", ne.Name, err)
+			ClientConn.Close()
+			wg.Done()
+			errdata <- true
+			return
 		}
 
 	} else {
-		sshc, err = sshagent.Init(ne.Name, ne.IpAddress, ne.SshPort, ne.Username, ne.Password, 10)
-	}
-
-	if err != nil {
-		log.Printf("connection error - %v - %v", ne.Name, err)
+		sshc, err = sshagent.Init(ne.Name, ne.IpAddress, ne.SshPort, ne.Username, ne.Password, 5)
+		if err != nil {
+			log.Printf("connection error - %v - %v", ne.Name, err)
+			ClientConn.Close()
+			wg.Done()
+			errdata <- true
+			return
+		}
 	}
 
 	for _, c := range cmds {
-		res, _ := sshc.Exec(c)
+		res, err = sshc.Exec(c)
+		if err != nil {
+			sshc.Disconnect()
+			log.Printf("command exec error - %v - %v", ne.Name, err)
+			ClientConn.Close()
+			wg.Done()
+			errdata <- true
+			return
+		}
 		if strings.Contains(c, "awk") {
 			result.Cpu = cpuParse(res)
 		} else if strings.Contains(c, "free -m") {
@@ -135,16 +165,15 @@ func NodeQuery(busyWorkers *int, wg *sync.WaitGroup, ch chan ResourceUtil, cmds 
 	func() {
 		for {
 			select {
-			case <-chx:
+			case <-pipeprogress:
 				return
 			case <-time.After(1 * time.Second):
 				continue
 			}
 		}
 	}()
-
 	ClientConn.Close()
-	ch <- result
+	nedata <- result
 	wg.Done()
 	*busyWorkers -= 1
 }
