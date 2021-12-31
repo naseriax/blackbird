@@ -1,13 +1,13 @@
-package retriever
+package main
 
 import (
 	"blackbird/pkgs/ioreader"
 	"blackbird/pkgs/sshagent"
+	"blackbird/pkgs/staff"
 	"fmt"
 	"log"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	"golang.org/x/crypto/ssh"
@@ -75,7 +75,7 @@ func dskParse(res string) map[string]float64 {
 	return output
 }
 
-func NodeQuery(busyWorkers *int, wg *sync.WaitGroup, nedata chan ResourceUtil, errdata chan bool, cmds []string, ne ioreader.Node, config ioreader.Config) {
+func QueryFromNode(hr *staff.Staff, chs ResultControl, cmds []string, ne ioreader.Node, config ioreader.Config) {
 	log.Printf("collecting info from ne %v", ne.Name)
 	var err error
 	var res string
@@ -102,8 +102,9 @@ func NodeQuery(busyWorkers *int, wg *sync.WaitGroup, nedata chan ResourceUtil, e
 		if err != nil {
 			if strings.Contains(err.Error(), "i/o timeout") {
 				log.Println("failed to connect to the ssh gateway - gateway unreachable!")
-				wg.Done()
-				errdata <- true
+				hr.WorkerSchedule.Done()
+				hr.BusyWorkers -= 1
+				chs.IsNodeQueryFailed <- true
 				return
 			} else {
 				log.Fatalf("failed to connect to the ssh server: %q", err)
@@ -117,8 +118,9 @@ func NodeQuery(busyWorkers *int, wg *sync.WaitGroup, nedata chan ResourceUtil, e
 			break
 		case <-time.After(10 * time.Second):
 			log.Printf("failed to create the local listener channel - %v - %v", ne.Name, err)
-			wg.Done()
-			errdata <- true
+			hr.WorkerSchedule.Done()
+			hr.BusyWorkers -= 1
+			chs.IsNodeQueryFailed <- true
 			return
 		}
 
@@ -126,8 +128,9 @@ func NodeQuery(busyWorkers *int, wg *sync.WaitGroup, nedata chan ResourceUtil, e
 		if err != nil {
 			log.Printf("connect() error - %v - %v", ne.Name, err)
 			ClientConn.Close()
-			wg.Done()
-			errdata <- true
+			hr.WorkerSchedule.Done()
+			hr.BusyWorkers -= 1
+			chs.IsNodeQueryFailed <- true
 			return
 		}
 
@@ -136,8 +139,9 @@ func NodeQuery(busyWorkers *int, wg *sync.WaitGroup, nedata chan ResourceUtil, e
 		if err != nil {
 			log.Printf("connection error - %v - %v", ne.Name, err)
 			ClientConn.Close()
-			wg.Done()
-			errdata <- true
+			hr.WorkerSchedule.Done()
+			hr.BusyWorkers -= 1
+			chs.IsNodeQueryFailed <- true
 			return
 		}
 	}
@@ -148,8 +152,8 @@ func NodeQuery(busyWorkers *int, wg *sync.WaitGroup, nedata chan ResourceUtil, e
 			sshc.Disconnect()
 			log.Printf("command exec error - %v - %v", ne.Name, err)
 			ClientConn.Close()
-			wg.Done()
-			errdata <- true
+			hr.WorkerSchedule.Done()
+			chs.IsNodeQueryFailed <- true
 			return
 		}
 		if strings.Contains(c, "awk") {
@@ -173,12 +177,12 @@ func NodeQuery(busyWorkers *int, wg *sync.WaitGroup, nedata chan ResourceUtil, e
 		}
 	}()
 	ClientConn.Close()
-	nedata <- result
-	wg.Done()
-	*busyWorkers -= 1
+	chs.QueryResult <- result
+	hr.WorkerSchedule.Done()
+	hr.BusyWorkers -= 1
 }
 
-func UtilizationAssessment(nodes map[string]ioreader.Node, result ResourceUtil) {
+func AssessUtil(nodes map[string]ioreader.Node, result ResourceUtil) {
 	if result.Cpu >= nodes[result.Name].CpuThreshold {
 		log.Printf("Crossed the cpu threshold in NE: %v - Current Value: %v, Threshold: %v\n", result.Name, result.Cpu, nodes[result.Name].CpuThreshold)
 	}

@@ -10,17 +10,17 @@ import (
 )
 
 type Config struct {
-	MailRelayIp    string `json:"mailRelayIp"`
-	MailInterval   string `json:"mailInterval"`
-	LogfileSize    string `json:"logSize"`
-	QueryInterval  string `json:"queryInterval"`
-	WorkerQuantity string `json:"workerQuantity"`
-	InputFileName  string `json:"InputFileName"`
-	SshTunnel      bool   `json:"sshTunnel"`
-	SshGwIp        string `json:"sshGwIp"`
-	SshGwUser      string `json:"sshGwUser"`
-	SshGwPass      string `json:"sshGwPass"`
-	SshGwPort      string `json:"sshGwPort"`
+	MailRelayIp   string `json:"mailRelayIp"`
+	MailInterval  string `json:"mailInterval"`
+	LogfileSize   string `json:"logSize"`
+	QueryInterval int    `json:"queryInterval"`
+	TotalWorkers  int    `json:"totalWorkers"`
+	InputFileName string `json:"InputFileName"`
+	SshTunnel     bool   `json:"sshTunnel"`
+	SshGwIp       string `json:"sshGwIp"`
+	SshGwUser     string `json:"sshGwUser"`
+	SshGwPass     string `json:"sshGwPass"`
+	SshGwPort     string `json:"sshGwPort"`
 }
 
 type Node struct {
@@ -36,7 +36,7 @@ type Node struct {
 	Localport        string
 }
 
-func ParseCSV(csvdata [][]string, isTunnel bool) map[string]Node {
+func parseCSV(csvdata [][]string) map[string]Node {
 	nodes := map[string]Node{}
 	floatVals := [3]float64{}
 
@@ -59,9 +59,7 @@ func ParseCSV(csvdata [][]string, isTunnel bool) map[string]Node {
 			RamThreshold:     floatVals[1],
 			DiskThreshold:    floatVals[2],
 			SshPort:          row[8],
-		}
-		if isTunnel {
-			tmp.Localport = row[9]
+			Localport:        row[9],
 		}
 		nodes[tmp.Name] = tmp
 	}
@@ -83,7 +81,7 @@ func readCsvFile(filePath string) [][]string {
 	return records
 }
 
-func ConfigLoader(filePath string) Config {
+func LoadConfig(filePath string) Config {
 	file, err := ioutil.ReadFile(filePath)
 	if err != nil {
 		log.Fatal("Unable to read the config file "+filePath, err)
@@ -95,8 +93,8 @@ func ConfigLoader(filePath string) Config {
 	return config
 }
 
-func NodeLoader(filename string, isTunnel bool) map[string]Node {
+func LoadNode(filename string) map[string]Node {
 	records := readCsvFile(filename)
-	nodeList := ParseCSV(records, isTunnel)
+	nodeList := parseCSV(records)
 	return nodeList
 }
